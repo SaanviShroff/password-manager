@@ -1,0 +1,16 @@
+# Python environment
+venv/
+__pycache__/
+*.pyc
+
+# IDEs
+.vscode/
+.idea/
+
+# Database files
+vault.json
+
+# PyInstaller / Build artifacts
+build/
+dist/
+*.spec
