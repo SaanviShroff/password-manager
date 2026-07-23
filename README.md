@@ -10,6 +10,7 @@ Instead of trusting your passwords to a cloud server, MyVault saves everything s
 * **Built-in Password Generator:** Need a strong password? Click one button to generate a highly secure, random password.
 * **Instant Search:** Find your accounts quickly by typing in the search bar.
 * **Click to Copy:** Copy your passwords directly to your clipboard so you don't have to type them out.
+* **Data Portability:** Easily import existing passwords or export your vault using CSV files.
 * **Fully Offline:** Doesn't connect to the internet, keeping your data safe from online hackers.
 
 ## How it Keeps You Safe
@@ -19,6 +20,7 @@ Even though this app is easy to use, it has serious security under the hood:
 * **Your Master Password is a Secret:** The app never saves your Master Password anywhere. 
 * **Data Scrambling:** When you save your passwords, the app scrambles them into unreadable gibberish (using industry-standard AES encryption). Without your Master Password, the saved file is completely useless to anyone who tries to open it.
 * **Auto-Locking:** When you click "Lock Vault", the app instantly forgets your data until you log in again.
+* **Export Warning:** If you choose to export your vault to a CSV, that file is saved in plain text. Please securely delete exported CSV files immediately after migrating your data!
 
 ## How to Run It
 
