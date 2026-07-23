@@ -1,3 +1,4 @@
+import csv
 import json
 import os
 from . import crypto
@@ -57,6 +58,41 @@ class VaultManager:
             self._save()
         else:
             raise KeyError("Site not found")
+
+    def export_csv(self, filepath: str) -> None:
+        """Exports the entire vault to a plain-text CSV file."""
+        if not self.is_unlocked:
+            raise PermissionError("Vault is locked!")
+            
+        with open(filepath, mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.writer(file)
+            writer.writerow(["Site", "Username", "Password"])
+            
+            for site, credentials in self.data.items():
+                writer.writerow([site, credentials["username"], credentials["password"]])
+
+    def import_csv(self, filepath: str) -> int:
+        """Imports passwords from a CSV and overwrites duplicates."""
+        if not self.is_unlocked:
+            raise PermissionError("Vault is locked!")
+            
+        imported_count = 0
+        with open(filepath, mode='r', encoding='utf-8') as file:
+            reader = csv.DictReader(file)
+            for row in reader:
+                # We expect standard headers: Site, Username, Password
+                site = row.get("Site")
+                username = row.get("Username", "")
+                password = row.get("Password")
+                
+                if site and password:
+                    self.data[site] = {"username": username, "password": password}
+                    imported_count += 1
+                    
+        if imported_count > 0:
+            self._save()
+            
+        return imported_count
 
     def _save(self) -> None:
         if not self.is_unlocked or self.key is None or self.salt is None:

@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from tkinter import messagebox
+from tkinter import messagebox, filedialog
 import os
 from core.manager import VaultManager
 from core import database
@@ -34,7 +34,9 @@ ICONS = {
     "home": "⌂",
     "add": "➕",
     "globe": "🌐",
-    "user": "👤"
+    "user": "👤",
+    "import": "📥",
+    "export": "📤"
 }
 
 class PasswordManagerApp:
@@ -158,6 +160,39 @@ class PasswordManagerApp:
                 messagebox.showerror("Error", "Invalid Master Password!")
                 self.password_entry.delete(0, ctk.END)
 
+    def handle_import(self):
+        filepath = filedialog.askopenfilename(
+            filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")],
+            title="Select CSV to Import"
+        )
+        if filepath:
+            try:
+                count = self.vault.import_csv(filepath)
+                messagebox.showinfo("Success", f"Successfully imported {count} accounts!")
+                self.show_dashboard_tab()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to import: {e}\n\nPlease ensure the CSV has 'Site', 'Username', and 'Password' headers.")
+
+    def handle_export(self):
+        confirm = messagebox.askyesno(
+            "CRITICAL SECURITY WARNING",
+            "Exporting will save all your passwords in a PLAIN TEXT, unencrypted file.\n\nAnyone with access to this file will be able to read your passwords. Are you sure you want to continue?"
+        )
+        if not confirm:
+            return
+            
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV Files", "*.csv")],
+            title="Export Vault"
+        )
+        if filepath:
+            try:
+                self.vault.export_csv(filepath)
+                messagebox.showwarning("Export Successful", "Vault exported successfully.\n\nPLEASE DELETE THIS FILE securely when you are finished migrating your data!")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export: {e}")
+
     def lock_vault(self):
         self.vault.key = None
         self.vault.salt = None
@@ -208,6 +243,34 @@ class PasswordManagerApp:
             command=self.show_add_tab
         )
         self.btn_add.pack(pady=4, padx=16, fill=ctk.X)
+
+        self.btn_import = ctk.CTkButton(
+            sidebar,
+            text=f"{ICONS['import']} Import CSV",
+            fg_color="transparent",
+            hover_color=DESIGN["border"],
+            anchor="w",
+            height=40,
+            corner_radius=DESIGN["radius_input"],
+            text_color=DESIGN["text_muted"],
+            font=ctk.CTkFont(family=DESIGN["font_family"], size=14, weight="bold"),
+            command=self.handle_import
+        )
+        self.btn_import.pack(pady=4, padx=16, fill=ctk.X)
+
+        self.btn_export = ctk.CTkButton(
+            sidebar,
+            text=f"{ICONS['export']} Export CSV",
+            fg_color="transparent",
+            hover_color=DESIGN["border"],
+            anchor="w",
+            height=40,
+            corner_radius=DESIGN["radius_input"],
+            text_color=DESIGN["text_muted"],
+            font=ctk.CTkFont(family=DESIGN["font_family"], size=14, weight="bold"),
+            command=self.handle_export
+        )
+        self.btn_export.pack(pady=4, padx=16, fill=ctk.X)
         
         ctk.CTkButton(
             sidebar,
