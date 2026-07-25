@@ -4,6 +4,7 @@ import os
 from core.manager import VaultManager
 from core import database
 from core.generator import generate_password
+import csv
 
 ctk.set_appearance_mode("Dark")
 
@@ -81,13 +82,13 @@ class PasswordManagerApp:
 
         ctk.CTkLabel(
             card, 
-            text="Enter your master password to continue", 
+            text="Set a strong master password" if is_setup else "Enter your master password to continue", 
             font=ctk.CTkFont(family=DESIGN["font_family"], size=13),
             text_color=DESIGN["text_muted"]
         ).pack(pady=(0, 24), padx=48)
         
         pw_frame = ctk.CTkFrame(card, fg_color="transparent")
-        pw_frame.pack(pady=(0, 24), padx=48, fill=ctk.X)
+        pw_frame.pack(pady=(0, 16) if is_setup else (0, 24), padx=48, fill=ctk.X)
         pw_frame.grid_columnconfigure(0, weight=1)
         
         self.password_entry = ctk.CTkEntry(
@@ -114,6 +115,22 @@ class PasswordManagerApp:
             command=self.toggle_auth_password_visibility
         )
         self.auth_toggle_btn.grid(row=0, column=1, padx=(8, 0))
+
+        # Dynamically add the confirmation field if we are setting up a new vault
+        self.confirm_password_entry = None
+        if is_setup:
+            self.confirm_password_entry = ctk.CTkEntry(
+                card, 
+                show="*", 
+                height=40,
+                placeholder_text="Confirm Master Password",
+                corner_radius=DESIGN["radius_input"],
+                fg_color=DESIGN["panel"],
+                border_color=DESIGN["border"],
+                text_color=DESIGN["text"]
+            )
+            self.confirm_password_entry.pack(pady=(0, 24), padx=48, fill=ctk.X)
+            self.confirm_password_entry.bind('<Return>', lambda event: self.handle_auth(is_setup))
         
         self.password_entry.focus()
         
@@ -134,9 +151,13 @@ class PasswordManagerApp:
     def toggle_auth_password_visibility(self):
         if self.password_entry.cget("show") == "*":
             self.password_entry.configure(show="")
+            if self.confirm_password_entry:
+                self.confirm_password_entry.configure(show="")
             self.auth_toggle_btn.configure(text=ICONS["hide"])
         else:
             self.password_entry.configure(show="*")
+            if self.confirm_password_entry:
+                self.confirm_password_entry.configure(show="*")
             self.auth_toggle_btn.configure(text=ICONS["eye"])
 
     def handle_auth(self, is_setup: bool):
@@ -147,6 +168,14 @@ class PasswordManagerApp:
             return
             
         if is_setup:
+            confirm = self.confirm_password_entry.get()
+            if password != confirm:
+                messagebox.showerror("Error", "Passwords do not match. Please try again.")
+                self.password_entry.delete(0, ctk.END)
+                self.confirm_password_entry.delete(0, ctk.END)
+                self.password_entry.focus()
+                return
+                
             try:
                 self.vault.setup_new_vault(password)
                 self.show_vault_screen()
@@ -159,39 +188,7 @@ class PasswordManagerApp:
             else:
                 messagebox.showerror("Error", "Invalid Master Password!")
                 self.password_entry.delete(0, ctk.END)
-
-    def handle_import(self):
-        filepath = filedialog.askopenfilename(
-            filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")],
-            title="Select CSV to Import"
-        )
-        if filepath:
-            try:
-                count = self.vault.import_csv(filepath)
-                messagebox.showinfo("Success", f"Successfully imported {count} accounts!")
-                self.show_dashboard_tab()
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to import: {e}\n\nPlease ensure the CSV has 'Site', 'Username', and 'Password' headers.")
-
-    def handle_export(self):
-        confirm = messagebox.askyesno(
-            "CRITICAL SECURITY WARNING",
-            "Exporting will save all your passwords in a PLAIN TEXT, unencrypted file.\n\nAnyone with access to this file will be able to read your passwords. Are you sure you want to continue?"
-        )
-        if not confirm:
-            return
-            
-        filepath = filedialog.asksaveasfilename(
-            defaultextension=".csv",
-            filetypes=[("CSV Files", "*.csv")],
-            title="Export Vault"
-        )
-        if filepath:
-            try:
-                self.vault.export_csv(filepath)
-                messagebox.showwarning("Export Successful", "Vault exported successfully.\n\nPLEASE DELETE THIS FILE securely when you are finished migrating your data!")
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to export: {e}")
+                self.password_entry.focus()
 
     def lock_vault(self):
         self.vault.key = None
@@ -421,9 +418,11 @@ class PasswordManagerApp:
             widget.destroy()
             
         search_term = self.search_var.get().lower()
+        items_displayed = 0
             
         for site in sorted(self.vault.data.keys()):
             if search_term in site.lower():
+                items_displayed += 1
                 card = ctk.CTkFrame(self.scrollable_frame, fg_color=DESIGN["panel"], corner_radius=DESIGN["radius_input"])
                 card.pack(pady=6, padx=8, fill=ctk.X)
                 
@@ -458,6 +457,20 @@ class PasswordManagerApp:
                     command=lambda s=site: self.on_site_selected(s)
                 )
                 view_btn.pack(side=ctk.RIGHT, padx=16)
+        
+        # Empty State Logic
+        if items_displayed == 0:
+            if search_term:
+                empty_message = f"No passwords found matching '{search_term}'."
+            else:
+                empty_message = "Your vault is empty.\nClick 'Add Password' in the sidebar to get started."
+                
+            ctk.CTkLabel(
+                self.scrollable_frame, 
+                text=empty_message,
+                font=ctk.CTkFont(family=DESIGN["font_family"], size=14),
+                text_color=DESIGN["text_muted"]
+            ).pack(pady=60)
 
     def auto_generate(self):
         new_pw = generate_password()
@@ -559,6 +572,39 @@ class PasswordManagerApp:
         self.root.clipboard_append(text)
         self.root.update()
         messagebox.showinfo("Success", "Password copied to clipboard!", parent=window)
+
+    def handle_import(self):
+        filepath = filedialog.askopenfilename(
+            filetypes=[("CSV Files", "*.csv"), ("All Files", "*.*")],
+            title="Select CSV to Import"
+        )
+        if filepath:
+            try:
+                count = self.vault.import_csv(filepath)
+                messagebox.showinfo("Success", f"Successfully imported {count} accounts!")
+                self.show_dashboard_tab()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to import: {e}\n\nPlease ensure the CSV has 'Site', 'Username', and 'Password' headers.")
+
+    def handle_export(self):
+        confirm = messagebox.askyesno(
+            "CRITICAL SECURITY WARNING",
+            "Exporting will save all your passwords in a PLAIN TEXT, unencrypted file.\n\nAnyone with access to this file will be able to read your passwords. Are you sure you want to continue?"
+        )
+        if not confirm:
+            return
+            
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".csv",
+            filetypes=[("CSV Files", "*.csv")],
+            title="Export Vault"
+        )
+        if filepath:
+            try:
+                self.vault.export_csv(filepath)
+                messagebox.showwarning("Export Successful", "Vault exported successfully.\n\nPLEASE DELETE THIS FILE securely when you are finished migrating your data!")
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export: {e}")
 
 if __name__ == "__main__":
     root = ctk.CTk()
